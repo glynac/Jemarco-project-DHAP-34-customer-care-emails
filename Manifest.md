@@ -12,6 +12,7 @@
 | **Format**      | CSV (auto-converted to Parquet on HuggingFace)                                            |
 | **Size**        | 2,259 rows · 1.52 MB                                                                      |
 | **Splits**      | `train` only (single split, 2,259 rows)                                                   |
+| **Local Path**  | `sample_data/dataset.csv`                                                               |
 | **Last Updated**| November 8, 2024                                                                          |
 
 
