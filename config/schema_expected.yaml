@@ -1,0 +1,207 @@
+# expected_schema.yaml
+
+
+dataset:
+  table: customer_care_emails
+  source: huggingface
+  identifier: rtweera/customer_care_emails
+  format: csv          # auto-converted to Parquet by Hugging Face
+  language: en
+  split: train
+  total_rows: 2259
+  size_bytes: 1594982  # ~1.52 MB
+
+fields:
+
+  - name: subject
+    dtype: string
+    nullable: false
+    description: >
+      Subject line of the email thread. Shared by all emails within the same thread.
+    constraints:
+      min_length: 15
+      max_length: 118
+
+  - name: sender
+    dtype: string
+    nullable: false
+    description: Email address of the message sender.
+    constraints:
+      pattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      unique_values: 90   # 90 distinct senders observed in dataset
+
+  - name: receiver
+    dtype: string
+    nullable: false
+    description: Email address of the message recipient.
+    constraints:
+      pattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      unique_values: 90   # 90 distinct receivers observed in dataset
+
+  - name: timestamp
+    dtype: string          # stored as ISO-8601 string; parse to datetime before use
+    nullable: false
+    description: >
+      Date and time when the email was sent/received. Format varies slightly
+      across rows (with or without microseconds, always timezone-aware UTC).
+    constraints:
+      min_length: 19
+      max_length: 32
+      format_hint: "ISO 8601 with UTC offset, e.g. '2023-10-26 10:02:34+00:00'"
+
+  - name: message_body
+    dtype: string
+    nullable: false
+    description: Full plain-text body of the email message.
+    constraints:
+      min_length: 30
+      max_length: 1490    # ~1.49k chars
+
+  - name: thread_id
+    dtype: string
+    nullable: false
+    description: >
+      Unique identifier that groups individual emails into a conversation thread.
+      Multiple rows share the same thread_id; the ID itself is unique per thread,
+      not per row.
+    constraints:
+      min_length: 28
+      max_length: 43
+      pattern: "^aa\\d{3}-[0-9a-f\\-]{35,}$"
+
+  - name: email_types
+    dtype: string          # stored as a stringified Python list, e.g. "['inquiry']"
+    nullable: false
+    description: >
+      Categorical tag(s) indicating the nature of the email.
+      Stored as a bracketed, single-quoted list string. Parse before use.
+    constraints:
+      allowed_values:
+        - "['inquiry']"
+        - "['issue']"
+        - "['suggestion']"
+        - "['inquiry', 'issue']"
+      unique_classes: 4
+
+  - name: email_status
+    dtype: string
+    nullable: false
+    description: Lifecycle state of the support thread.
+    constraints:
+      allowed_values:
+        - ongoing
+        - completed
+      unique_classes: 2
+
+  - name: email_criticality
+    dtype: string
+    nullable: false
+    description: >
+      Business criticality of the email thread, reflecting customer urgency
+      and potential service impact.
+    constraints:
+      allowed_values:
+        - low
+        - medium
+        - high
+      unique_classes: 3
+
+  - name: product_types
+    dtype: string          # stored as a stringified Python list
+    nullable: false
+    description: >
+      Aetheros product(s) referenced in the email thread.
+      Stored as a bracketed, single-quoted list string. Parse before use.
+    constraints:
+      element_allowed_values:
+        - API development
+        - API Development      # note: casing inconsistency observed in source data
+        - API monitoring
+        - IAM service
+        - Mercury Language
+        - Cloud management
+        - Cloud Management     # note: casing inconsistency observed in source data
+      unique_combinations: 79
+
+  - name: agent_effectivity
+    dtype: string
+    nullable: false
+    description: >
+      Qualitative rating of how effectively the support agent resolved
+      the customer's issue.
+    constraints:
+      allowed_values:
+        - very low
+        - low
+        - medium
+        - high
+        - very high
+      unique_classes: 5
+      ordinal_order:
+        - very low
+        - low
+        - medium
+        - high
+        - very high
+
+  - name: agent_efficiency
+    dtype: string
+    nullable: false
+    description: >
+      Qualitative rating of how efficiently (i.e. how quickly) the support
+      agent responded and resolved the customer's issue.
+    constraints:
+      allowed_values:
+        - very low
+        - low
+        - medium
+        - high
+        - very high
+      unique_classes: 5
+      ordinal_order:
+        - very low
+        - low
+        - medium
+        - high
+        - very high
+
+  - name: customer_satisfaction
+    dtype: float64
+    nullable: false
+    description: >
+      Continuous sentiment score representing the customer's emotional state
+      throughout the thread. Negative values indicate frustration or anger;
+      positive values indicate satisfaction or happiness.
+    constraints:
+      minimum: -1.0
+      maximum: 1.0
+
+# ---------------------------------------------------------------------------
+# Data quality notes for pipeline validation
+# ---------------------------------------------------------------------------
+quality_notes:
+  - field: product_types
+    note: >
+      Casing inconsistency — 'Cloud Management' and 'Cloud management' both appear,
+      as do 'API Development' and 'API development'. Normalise to a canonical casing
+      (e.g. title-case) during ingestion.
+
+  - field: email_types
+    note: >
+      Values are stored as Python-style list literals (e.g. "['inquiry']").
+      Use ast.literal_eval or a regex strip before treating as a list.
+
+  - field: product_types
+    note: Same serialisation caveat as email_types above.
+
+  - field: timestamp
+    note: >
+      Some rows include microseconds (e.g. "2023-10-26 14:32:51.953000+00:00")
+      while others do not. Use a flexible ISO-8601 parser (e.g. pandas
+      to_datetime with utc=True) rather than a fixed format string.
+
+  - field: thread_id
+    note: >
+      thread_id is NOT a row-level unique key. Many rows share the same
+      thread_id to represent an email conversation. Use (thread_id, timestamp)
+      as a composite key if row-level uniqueness is required.
