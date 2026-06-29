@@ -18,3 +18,6 @@ CREATE TABLE public.customer_care_emails (
     CONSTRAINT customer_care_emails_pkey
         PRIMARY KEY (thread_id, "timestamp")
 );
+
+
+
