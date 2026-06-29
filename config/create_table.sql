@@ -1,6 +1,6 @@
 -- create DB table matching the YAML schema
 
-CREATE TABLE public.customer_care_emails (
+CREATE TABLE IF NOT EXISTS public.customer_care_emails (
     subject                  TEXT                     NOT NULL,
     sender                   TEXT                     NOT NULL,
     receiver                 TEXT                     NOT NULL,
